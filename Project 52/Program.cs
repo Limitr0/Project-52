@@ -1,203 +1,160 @@
-﻿using System;
+// Проект разделен на несколько под-проектов:
+// - SharedComponents (интерфейсы и базовые классы)
+// - BusinessLogic (логика работы, например SMSProvider, Battery, CallHistory)
+// - ConsoleApp (консольное приложение)
+// - GUI (оконное приложение на WinForms)
+// - UnitTests (проект с юнит-тестами)
+
+// В каждом файле теперь только один класс или интерфейс.
+
+// BusinessLogic/CallHistory.cs
+using System;
 using System.Collections.Generic;
-using System.Text;
-using System.Threading;
+using System.Linq;
 using System.Threading.Tasks;
 
-namespace MobilePhoneLab
+public class CallHistory
 {
-    // Interfaces
-    public interface IScreenImage
-    {
-        string Content { get; }
-    }
+    private List<Call> calls = new List<Call>();
+    public event EventHandler CallsUpdated;
 
-    public interface IPlayback
+    public void AddCall(Call call)
     {
-        void Play(string soundData);
-    }
-
-    public interface IOutput
-    {
-        void Write(string text);
-    }
-
-    // Output classes
-    public class ConsoleOutput : IOutput
-    {
-        public void Write(string text)
+        var lastCall = calls.FirstOrDefault(c => c.PhoneNumber == call.PhoneNumber && c.IsIncoming == call.IsIncoming);
+        if (lastCall != null && (call.CallTime - lastCall.CallTime).TotalSeconds < 60)
         {
-            Console.WriteLine(text);
+            lastCall.Duration += call.Duration;
         }
+        else
+        {
+            calls.Add(call);
+            calls.Sort();
+        }
+        CallsUpdated?.Invoke(this, EventArgs.Empty);
     }
 
-    // Base classes and components
-    public abstract class ScreenBase
+    public async Task<List<Call>> GetCallsAsync(bool? isIncoming = null)
     {
-        public abstract void Show(IScreenImage screenImage);
-
-        public override string ToString() => "Generic Screen";
-    }
-
-    public class MonochromeScreen : ScreenBase
-    {
-        public override void Show(IScreenImage screenImage)
-        {
-            Console.WriteLine($"[Monochrome Screen] Displaying: {screenImage.Content}");
-        }
-
-        public override string ToString() => "Monochrome Screen";
-    }
-
-    public class ColorfulScreen : ScreenBase
-    {
-        public override void Show(IScreenImage screenImage)
-        {
-            Console.WriteLine($"[Colorful Screen] Displaying in color: {screenImage.Content}");
-        }
-
-        public override string ToString() => "Colorful Screen";
-    }
-
-    public class OLEDScreen : ColorfulScreen
-    {
-        public override void Show(IScreenImage screenImage)
-        {
-            Console.WriteLine($"[OLED Screen] Vivid Display: {screenImage.Content}");
-        }
-
-        public override string ToString() => "OLED Screen";
-    }
-
-    public abstract class Mobile
-    {
-        public abstract ScreenBase Screen { get; }
-        public abstract IPlayback PlaybackDevice { get; }
-
-        public string GetDescription()
-        {
-            var descriptionBuilder = new StringBuilder();
-            descriptionBuilder.AppendLine($"Screen Type: {Screen}");
-            return descriptionBuilder.ToString();
-        }
-    }
-
-    public class SimCorpMobile : Mobile
-    {
-        private readonly OLEDScreen _oledScreen = new OLEDScreen();
-        private readonly PhoneSpeaker _phoneSpeaker = new PhoneSpeaker(new ConsoleOutput());
-        public SMSProvider SmsProvider { get; } = new SMSProvider();
-
-        public override ScreenBase Screen => _oledScreen;
-        public override IPlayback PlaybackDevice => _phoneSpeaker;
-    }
-
-    public class PhoneSpeaker : IPlayback
-    {
-        private readonly IOutput _output;
-
-        public PhoneSpeaker(IOutput output)
-        {
-            _output = output;
-        }
-
-        public void Play(string soundData)
-        {
-            _output.Write($"Playing sound: {soundData} through phone speaker");
-        }
-    }
-
-    public class SMSProvider
-    {
-        public event EventHandler<MessageEventArgs> SMSReceived;
-        private readonly Random _random = new Random();
-        private bool _running;
-
-        public void Start()
-        {
-            _running = true;
-            Task.Run(() => GenerateMessages());
-        }
-
-        public void Stop()
-        {
-            _running = false;
-        }
-
-        private void GenerateMessages()
-        {
-            while (_running)
-            {
-                Thread.Sleep(_random.Next(2000, 5000)); // Generate message every 2-5 seconds
-                var message = new Message
-                {
-                    Sender = $"User{_random.Next(1, 10)}",
-                    Content = $"Hello from User{_random.Next(1, 10)}!",
-                    ReceivedTime = DateTime.Now
-                };
-                OnSMSReceived(message);
-            }
-        }
-
-        protected virtual void OnSMSReceived(Message message)
-        {
-            SMSReceived?.Invoke(this, new MessageEventArgs { Message = message });
-        }
-    }
-
-    public class Message
-    {
-        public string Sender { get; set; }
-        public string Content { get; set; }
-        public DateTime ReceivedTime { get; set; }
-
-        public override string ToString()
-        {
-            return $"[{ReceivedTime:HH:mm:ss}] {Sender}: {Content}";
-        }
-    }
-
-    public class MessageEventArgs : EventArgs
-    {
-        public Message Message { get; set; }
-    }
-
-    // Console Application
-    class Program
-    {
-        static void Main(string[] args)
-        {
-            var myPhone = new SimCorpMobile();
-            Console.WriteLine("--- Mobile Phone Description ---");
-            Console.WriteLine(myPhone.GetDescription());
-
-            // Display an image on the phone's screen
-            IScreenImage sampleImage = new ScreenImage { Content = "Hello, OOP World!" };
-            myPhone.Screen.Show(sampleImage);
-
-            // Play sound through playback device
-            myPhone.PlaybackDevice.Play("Startup Sound");
-
-            // SMS simulation
-            myPhone.SmsProvider.SMSReceived += (sender, eventArgs) =>
-            {
-                Console.WriteLine($"New SMS: {eventArgs.Message}");
-            };
-
-            Console.WriteLine("Starting SMS generator...");
-            myPhone.SmsProvider.Start();
-
-            Console.WriteLine("\nPress any key to stop SMS generator...");
-            Console.ReadKey();
-            myPhone.SmsProvider.Stop();
-        }
-    }
-
-    // Sample screen image
-    public class ScreenImage : IScreenImage
-    {
-        public string Content { get; set; }
+        return await Task.Run(() =>
+            calls
+                .Where(c => isIncoming == null || c.IsIncoming == isIncoming)
+                .OrderByDescending(c => c.CallTime)
+                .ToList());
     }
 }
+
+// BusinessLogic/MessageHistory.cs
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+public class MessageHistory
+{
+    private List<Message> messages = new List<Message>();
+    public event EventHandler MessagesUpdated;
+
+    public void AddMessage(Message message)
+    {
+        messages.Add(message);
+        MessagesUpdated?.Invoke(this, EventArgs.Empty);
+    }
+
+    public async Task<List<Message>> GetMessagesAsync(string senderFilter = "", string textFilter = "")
+    {
+        return await Task.Run(() =>
+            messages
+                .Where(m => (string.IsNullOrEmpty(senderFilter) || m.Sender.Contains(senderFilter))
+                         && (string.IsNullOrEmpty(textFilter) || m.Content.Contains(textFilter)))
+                .OrderByDescending(m => m.ReceivedTime)
+                .ToList());
+    }
+}
+
+// GUI/MainForm.cs
+using System;
+using System.Windows.Forms;
+using System.Threading.Tasks;
+
+public class MainForm : Form
+{
+    private ListBox callListBox;
+    private ListBox messageListBox;
+    private Button refreshButton;
+    private CallHistory callHistory;
+    private MessageHistory messageHistory;
+
+    public MainForm()
+    {
+        Text = "SimCorp Mobile";
+        Width = 500;
+        Height = 400;
+
+        callListBox = new ListBox { Dock = DockStyle.Top, Height = 150 };
+        messageListBox = new ListBox { Dock = DockStyle.Bottom, Height = 150 };
+        refreshButton = new Button { Text = "Refresh", Dock = DockStyle.Fill };
+        refreshButton.Click += async (s, e) => await RefreshData();
+
+        Controls.Add(callListBox);
+        Controls.Add(refreshButton);
+        Controls.Add(messageListBox);
+
+        callHistory = new CallHistory();
+        messageHistory = new MessageHistory();
+    }
+
+    private async Task RefreshData()
+    {
+        callListBox.Items.Clear();
+        messageListBox.Items.Clear();
+
+        var calls = await callHistory.GetCallsAsync();
+        foreach (var call in calls)
+        {
+            callListBox.Items.Add(call.ToString());
+        }
+
+        var messages = await messageHistory.GetMessagesAsync();
+        foreach (var message in messages)
+        {
+            messageListBox.Items.Add(message.ToString());
+        }
+    }
+}
+
+// UnitTests/FiltersTests.cs
+using NUnit.Framework;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+[TestFixture]
+public class FiltersTests
+{
+    [Test]
+    public async Task CallHistory_Should_Filter_Incoming_Calls_Async()
+    {
+        var callHistory = new CallHistory();
+        callHistory.AddCall(new Call { PhoneNumber = "12345", CallTime = DateTime.Now, IsIncoming = true });
+        callHistory.AddCall(new Call { PhoneNumber = "67890", CallTime = DateTime.Now, IsIncoming = false });
+        
+        var incomingCalls = await callHistory.GetCallsAsync(true);
+        Assert.AreEqual(1, incomingCalls.Count);
+        Assert.IsTrue(incomingCalls[0].IsIncoming);
+    }
+
+    [Test]
+    public async Task MessageHistory_Should_Filter_By_Sender_Async()
+    {
+        var messageHistory = new MessageHistory();
+        messageHistory.AddMessage(new Message { Sender = "Alice", Content = "Hello" });
+        messageHistory.AddMessage(new Message { Sender = "Bob", Content = "Hi" });
+        
+        var filteredMessages = await messageHistory.GetMessagesAsync(senderFilter: "Alice");
+        Assert.AreEqual(1, filteredMessages.Count);
+        Assert.AreEqual("Alice", filteredMessages[0].Sender);
+    }
+}
+
 
 
