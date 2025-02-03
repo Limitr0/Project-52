@@ -84,6 +84,43 @@ namespace ConsoleApp
     }
 }
 
+// GUI (Графический интерфейс)
+namespace GUI
+{
+    using System;
+    using System.Windows.Forms;
+    using BusinessLogic;
+    using SharedComponents;
+    
+    public class MainForm : Form
+    {
+        private Button btnShowInfo;
+        private Label lblInfo;
+        private MobilePhone phone;
+
+        public MainForm()
+        {
+            phone = new MobilePhone(new MonochromeScreen(), new SimCard("+123456789"), new PhoneSpeaker());
+            btnShowInfo = new Button { Text = "Show Info", Left = 10, Top = 10, Width = 100 };
+            lblInfo = new Label { Left = 10, Top = 50, Width = 200 };
+            btnShowInfo.Click += (sender, args) => lblInfo.Text = $"SIM: {phone.Sim.Number}, Battery: {phone.Battery.Charge}%";
+            Controls.Add(btnShowInfo);
+            Controls.Add(lblInfo);
+        }
+    }
+
+    public class Program
+    {
+        [STAThread]
+        public static void Main()
+        {
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            Application.Run(new MainForm());
+        }
+    }
+}
+
 // UnitTests (Простые тесты)
 namespace UnitTests
 {
@@ -111,4 +148,3 @@ namespace UnitTests
             Assert.AreEqual(80, phone.Battery.Charge);
         }
     }
-}
