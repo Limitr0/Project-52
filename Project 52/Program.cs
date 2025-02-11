@@ -1,150 +1,202 @@
-// SharedComponents (Общие интерфейсы и классы)
-namespace SharedComponents
+// Разделение на уровни:
+// - Shared (общие интерфейсы и базовые классы)
+// - DataAccess (доступ к данным)
+// - BusinessLogic (бизнес-логика)
+// - API (Web API для взаимодействия)
+// - ConsoleApp (консольное приложение)
+// - GUI (WinForms приложение)
+// - UnitTests (юнит-тесты)
+
+// В каждом файле теперь только один класс или интерфейс.
+
+// Shared/Models/Call.cs
+using System;
+
+public class Call
 {
-    public interface IScreen
+    public string PhoneNumber { get; set; }
+    public DateTime CallTime { get; set; }
+    public bool IsIncoming { get; set; }
+}
+
+// Shared/Models/Message.cs
+using System;
+
+public class Message
+{
+    public string Sender { get; set; }
+    public string Content { get; set; }
+    public DateTime ReceivedTime { get; set; }
+}
+
+// API/Controllers/MessageController.cs
+using Microsoft.AspNetCore.Mvc;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+[ApiController]
+[Route("api/messages")]
+public class MessageController : ControllerBase
+{
+    private readonly IMessageService _messageService;
+
+    public MessageController(IMessageService messageService)
     {
-        void Show(string content);
+        _messageService = messageService;
     }
 
-    public class Battery
+    [HttpGet]
+    public async Task<IEnumerable<Message>> GetMessages()
     {
-        public int Charge { get; private set; } = 100;
-        public void Use(int amount) => Charge = Math.Max(0, Charge - amount);
-        public void ChargeBattery(int amount) => Charge = Math.Min(100, Charge + amount);
+        return await _messageService.GetMessagesAsync();
     }
 
-    public class SimCard
+    [HttpPost]
+    public IActionResult AddMessage([FromBody] Message message)
     {
-        public string Number { get; }
-        public SimCard(string number) => Number = number;
-    }
-
-    public interface IPlayback
-    {
-        void PlaySound(string sound);
+        _messageService.AddMessage(message);
+        return Ok();
     }
 }
 
-// BusinessLogic (Логика работы)
-namespace BusinessLogic
+// BusinessLogic/Interfaces/IMessageService.cs
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+public interface IMessageService
 {
-    using SharedComponents;
-    
-    public class MonochromeScreen : IScreen
+    void AddMessage(Message message);
+    Task<List<Message>> GetMessagesAsync();
+}
+
+// BusinessLogic/Services/MessageService.cs
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+public class MessageService : IMessageService
+{
+    private readonly IMessageRepository _messageRepository;
+
+    public MessageService(IMessageRepository messageRepository)
     {
-        public void Show(string content) => Console.WriteLine("[Monochrome] " + content);
+        _messageRepository = messageRepository;
     }
 
-    public class PhoneSpeaker : IPlayback
+    public void AddMessage(Message message)
     {
-        public void PlaySound(string sound) => Console.WriteLine("Playing sound: " + sound);
+        _messageRepository.Save(message);
     }
 
-    public class MobilePhone
+    public async Task<List<Message>> GetMessagesAsync()
     {
-        public IScreen Screen { get; }
-        public Battery Battery { get; }
-        public SimCard Sim { get; }
-        public IPlayback Speaker { get; }
+        return await Task.Run(() => _messageRepository.GetMessages());
+    }
+}
 
-        public MobilePhone(IScreen screen, SimCard sim, IPlayback speaker)
+// DataAccess/Interfaces/IMessageRepository.cs
+using System.Collections.Generic;
+
+public interface IMessageRepository
+{
+    void Save(Message message);
+    List<Message> GetMessages();
+}
+
+// DataAccess/Repositories/MessageRepository.cs
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+public class MessageRepository : IMessageRepository
+{
+    private List<Message> messages = new List<Message>();
+
+    public void Save(Message message)
+    {
+        messages.Add(message);
+    }
+
+    public List<Message> GetMessages()
+    {
+        return messages.OrderByDescending(m => m.ReceivedTime).ToList();
+    }
+}
+
+// GUI/MainForm.cs
+using System;
+using System.Windows.Forms;
+using System.Threading.Tasks;
+
+public class MainForm : Form
+{
+    private ListBox callListBox;
+    private ListBox messageListBox;
+    private Button refreshButton;
+    private CallService callService;
+    private MessageService messageService;
+
+    public MainForm()
+    {
+        Text = "SimCorp Mobile";
+        Width = 500;
+        Height = 400;
+
+        callListBox = new ListBox { Dock = DockStyle.Top, Height = 150 };
+        messageListBox = new ListBox { Dock = DockStyle.Bottom, Height = 150 };
+        refreshButton = new Button { Text = "Refresh", Dock = DockStyle.Fill };
+        refreshButton.Click += async (s, e) => await RefreshData();
+
+        Controls.Add(callListBox);
+        Controls.Add(refreshButton);
+        Controls.Add(messageListBox);
+
+        callService = new CallService(new CallRepository());
+        messageService = new MessageService(new MessageRepository());
+    }
+
+    private async Task RefreshData()
+    {
+        callListBox.Items.Clear();
+        messageListBox.Items.Clear();
+
+        var calls = await callService.GetCallsAsync();
+        foreach (var call in calls)
         {
-            Screen = screen;
-            Sim = sim;
-            Battery = new Battery();
-            Speaker = speaker;
+            callListBox.Items.Add(call.ToString());
         }
 
-        public void DisplayInfo()
+        var messages = await messageService.GetMessagesAsync();
+        foreach (var message in messages)
         {
-            Screen.Show($"SIM: {Sim.Number}, Battery: {Battery.Charge}%");
-        }
-
-        public void PlayRingtone()
-        {
-            Speaker.PlaySound("Default Ringtone");
+            messageListBox.Items.Add(message.ToString());
         }
     }
 }
 
-// ConsoleApp (Консольное приложение)
-namespace ConsoleApp
+// UnitTests/MessageServiceTests.cs
+using NUnit.Framework;
+using Moq;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+[TestFixture]
+public class MessageServiceTests
 {
-    using BusinessLogic;
-    using SharedComponents;
-    
-    class Program
+    [Test]
+    public async Task MessageService_Should_Retrieve_Saved_Messages()
     {
-        static void Main()
+        var mockRepo = new Mock<IMessageRepository>();
+        mockRepo.Setup(repo => repo.GetMessages()).Returns(new List<Message>
         {
-            var phone = new MobilePhone(new MonochromeScreen(), new SimCard("+123456789"), new PhoneSpeaker());
-            phone.DisplayInfo();
-            phone.PlayRingtone();
-        }
+            new Message { Sender = "Alice", Content = "Hello", ReceivedTime = DateTime.Now }
+        });
+        
+        var service = new MessageService(mockRepo.Object);
+        var messages = await service.GetMessagesAsync();
+        
+        Assert.AreEqual(1, messages.Count);
+        Assert.AreEqual("Alice", messages[0].Sender);
     }
 }
-
-// GUI (Графический интерфейс)
-namespace GUI
-{
-    using System;
-    using System.Windows.Forms;
-    using BusinessLogic;
-    using SharedComponents;
-    
-    public class MainForm : Form
-    {
-        private Button btnShowInfo;
-        private Label lblInfo;
-        private MobilePhone phone;
-
-        public MainForm()
-        {
-            phone = new MobilePhone(new MonochromeScreen(), new SimCard("+123456789"), new PhoneSpeaker());
-            btnShowInfo = new Button { Text = "Show Info", Left = 10, Top = 10, Width = 100 };
-            lblInfo = new Label { Left = 10, Top = 50, Width = 200 };
-            btnShowInfo.Click += (sender, args) => lblInfo.Text = $"SIM: {phone.Sim.Number}, Battery: {phone.Battery.Charge}%";
-            Controls.Add(btnShowInfo);
-            Controls.Add(lblInfo);
-        }
-    }
-
-    public class Program
-    {
-        [STAThread]
-        public static void Main()
-        {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new MainForm());
-        }
-    }
-}
-
-// UnitTests (Простые тесты)
-namespace UnitTests
-{
-    using BusinessLogic;
-    using SharedComponents;
-    using NUnit.Framework;
-    
-    [TestFixture]
-    public class MobilePhoneTests
-    {
-        [Test]
-        public void Battery_Decreases_WhenUsed()
-        {
-            var phone = new MobilePhone(new MonochromeScreen(), new SimCard("+123456789"), new PhoneSpeaker());
-            phone.Battery.Use(10);
-            Assert.AreEqual(90, phone.Battery.Charge);
-        }
-
-        [Test]
-        public void Battery_Increases_WhenCharged()
-        {
-            var phone = new MobilePhone(new MonochromeScreen(), new SimCard("+123456789"), new PhoneSpeaker());
-            phone.Battery.Use(50);
-            phone.Battery.ChargeBattery(30);
-            Assert.AreEqual(80, phone.Battery.Charge);
-        }
-    }
