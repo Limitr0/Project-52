@@ -1,0 +1,28 @@
+using Microsoft.AspNetCore.Mvc;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+[ApiController]
+[Route("api/calls")]
+public class CallController : ControllerBase
+{
+    private readonly ICallService _callService;
+
+    public CallController(ICallService callService)
+    {
+        _callService = callService;
+    }
+
+    [HttpGet]
+    public async Task<IEnumerable<Call>> GetCalls()
+    {
+        return await _callService.GetCallsAsync();
+    }
+
+    [HttpPost]
+    public IActionResult AddCall([FromBody] Call call)
+    {
+        _callService.AddCall(call);
+        return Ok();
+    }
+}
