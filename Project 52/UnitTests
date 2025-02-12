@@ -1,0 +1,25 @@
+using NUnit.Framework;
+using Moq;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+[TestFixture]
+public class CallServiceTests
+{
+    [Test]
+    public async Task CallService_Should_Retrieve_Saved_Calls()
+    {
+        var mockRepo = new Mock<ICallRepository>();
+        mockRepo.Setup(repo => repo.GetCalls()).Returns(new List<Call>
+        {
+            new Call { PhoneNumber = "12345", CallTime = DateTime.Now, IsIncoming = true }
+        });
+
+        var service = new CallService(mockRepo.Object);
+        var calls = await service.GetCallsAsync();
+
+        Assert.AreEqual(1, calls.Count);
+        Assert.AreEqual("12345", calls[0].PhoneNumber);
+    }
+}
