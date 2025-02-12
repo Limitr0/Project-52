@@ -1,0 +1,12 @@
+using System;
+using System.Windows.Forms;
+
+public class MainForm : Form
+{
+    public MainForm()
+    {
+        Text = "SimCorp Mobile";
+        Width = 500;
+        Height = 400;
+    }
+}
