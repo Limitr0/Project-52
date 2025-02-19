@@ -2,7 +2,6 @@
 // - Shared (общие интерфейсы и базовые классы)
 // - DataAccess (доступ к данным)
 // - BusinessLogic (бизнес-логика)
-// - API (Web API для взаимодействия)
 // - ConsoleApp (консольное приложение)
 // - GUI (WinForms приложение)
 // - UnitTests (юнит-тесты)
@@ -27,39 +26,6 @@ public class Message
     public string Sender { get; set; }
     public string Content { get; set; }
     public DateTime ReceivedTime { get; set; }
-}
-
-// API/Controllers/MessageController.cs
-namespace API.Controllers;
-using Microsoft.AspNetCore.Mvc;
-using BusinessLogic.Interfaces;
-using Shared.Models;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-
-[ApiController]
-[Route("api/messages")]
-public class MessageController : ControllerBase
-{
-    private readonly IMessageService _messageService;
-
-    public MessageController(IMessageService messageService)
-    {
-        _messageService = messageService;
-    }
-
-    [HttpGet]
-    public async Task<IEnumerable<Message>> GetMessages()
-    {
-        return await _messageService.GetMessagesAsync();
-    }
-
-    [HttpPost]
-    public IActionResult AddMessage([FromBody] Message message)
-    {
-        _messageService.AddMessage(message);
-        return Ok();
-    }
 }
 
 // BusinessLogic/Interfaces/IMessageService.cs
@@ -213,3 +179,4 @@ public class MessageServiceTests
         Assert.AreEqual("Alice", messages[0].Sender);
     }
 }
+
