@@ -10,7 +10,7 @@
 // В каждом файле теперь только один класс или интерфейс.
 
 // Shared/Models/Call.cs
-using System;
+namespace Shared.Models;
 
 public class Call
 {
@@ -20,7 +20,7 @@ public class Call
 }
 
 // Shared/Models/Message.cs
-using System;
+namespace Shared.Models;
 
 public class Message
 {
@@ -30,7 +30,10 @@ public class Message
 }
 
 // API/Controllers/MessageController.cs
+namespace API.Controllers;
 using Microsoft.AspNetCore.Mvc;
+using BusinessLogic.Interfaces;
+using Shared.Models;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -60,6 +63,8 @@ public class MessageController : ControllerBase
 }
 
 // BusinessLogic/Interfaces/IMessageService.cs
+namespace BusinessLogic.Interfaces;
+using Shared.Models;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -70,6 +75,10 @@ public interface IMessageService
 }
 
 // BusinessLogic/Services/MessageService.cs
+namespace BusinessLogic.Services;
+using BusinessLogic.Interfaces;
+using Shared.Models;
+using DataAccess.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -95,6 +104,8 @@ public class MessageService : IMessageService
 }
 
 // DataAccess/Interfaces/IMessageRepository.cs
+namespace DataAccess.Interfaces;
+using Shared.Models;
 using System.Collections.Generic;
 
 public interface IMessageRepository
@@ -104,6 +115,9 @@ public interface IMessageRepository
 }
 
 // DataAccess/Repositories/MessageRepository.cs
+namespace DataAccess.Repositories;
+using DataAccess.Interfaces;
+using Shared.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -124,8 +138,11 @@ public class MessageRepository : IMessageRepository
 }
 
 // GUI/MainForm.cs
+namespace GUI;
 using System;
 using System.Windows.Forms;
+using BusinessLogic.Services;
+using DataAccess.Repositories;
 using System.Threading.Tasks;
 
 public class MainForm : Form
@@ -133,7 +150,6 @@ public class MainForm : Form
     private ListBox callListBox;
     private ListBox messageListBox;
     private Button refreshButton;
-    private CallService callService;
     private MessageService messageService;
 
     public MainForm()
@@ -151,20 +167,12 @@ public class MainForm : Form
         Controls.Add(refreshButton);
         Controls.Add(messageListBox);
 
-        callService = new CallService(new CallRepository());
         messageService = new MessageService(new MessageRepository());
     }
 
     private async Task RefreshData()
     {
-        callListBox.Items.Clear();
         messageListBox.Items.Clear();
-
-        var calls = await callService.GetCallsAsync();
-        foreach (var call in calls)
-        {
-            callListBox.Items.Add(call.ToString());
-        }
 
         var messages = await messageService.GetMessagesAsync();
         foreach (var message in messages)
@@ -175,8 +183,13 @@ public class MainForm : Form
 }
 
 // UnitTests/MessageServiceTests.cs
+namespace UnitTests;
 using NUnit.Framework;
 using Moq;
+using BusinessLogic.Interfaces;
+using DataAccess.Interfaces;
+using Shared.Models;
+using BusinessLogic.Services;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
