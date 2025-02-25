@@ -1,4 +1,5 @@
-namespace Shared;
+namespace BusinessLogic.Interfaces;
+using Shared.Models;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
