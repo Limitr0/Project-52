@@ -1,39 +1,43 @@
-namespace ConsoleApp;
-using BusinessLogic;
-using DataAccess;
-using Shared;
 using System;
+using BusinessLogic.Services;
+using DataAccess.Repositories;
+using Shared.Models;
+using System.Threading.Tasks;
 
-class Program
+namespace ConsoleApp
 {
-    static void Main()
+    internal class Program
     {
-        Console.WriteLine("Console Application Running...");
-
-        ICallRepository callRepository = new CallRepository();
-        IMessageRepository messageRepository = new MessageRepository();
-
-        ICallService callService = new CallService(callRepository);
-        IMessageService messageService = new MessageService(messageRepository);
-
-        callService.AddCall(new Call { PhoneNumber = "12345", CallTime = DateTime.Now, IsIncoming = true });
-        messageService.AddMessage(new Message { Sender = "Alice", Content = "Hello!", ReceivedTime = DateTime.Now });
-
-        var calls = callService.GetCallsAsync().Result;
-        var messages = messageService.GetMessagesAsync().Result;
-
-        Console.WriteLine("Calls:");
-        foreach (var call in calls)
+        static async Task Main()
         {
-            Console.WriteLine($"{call.CallTime}: {call.PhoneNumber} (Incoming: {call.IsIncoming})");
-        }
+            Console.WriteLine("Console Application Running...\n");
 
-        Console.WriteLine("\nMessages:");
-        foreach (var message in messages)
-        {
-            Console.WriteLine($"{message.ReceivedTime}: {message.Sender} - {message.Content}");
-        }
+            // Создаем сервисы
+            var callService = new CallService(new CallRepository());
+            var messageService = new MessageService(new MessageRepository());
 
-        Console.ReadKey();
+            // Добавляем тестовые данные
+            callService.AddCall(new Call { PhoneNumber = "12345", CallTime = DateTime.Now, IsIncoming = true });
+            messageService.AddMessage(new Message { Sender = "Alice", Content = "Hello!", ReceivedTime = DateTime.Now });
+
+            // Получаем и выводим звонки
+            var calls = await callService.GetCallsAsync();
+            Console.WriteLine("Calls:");
+            foreach (var call in calls)
+            {
+                Console.WriteLine($"{call.CallTime}: {call.PhoneNumber} (Incoming: {call.IsIncoming})");
+            }
+
+            // Получаем и выводим сообщения
+            var messages = await messageService.GetMessagesAsync();
+            Console.WriteLine("\nMessages:");
+            foreach (var message in messages)
+            {
+                Console.WriteLine($"{message.ReceivedTime}: {message.Sender} - {message.Content}");
+            }
+
+            Console.WriteLine("\nPress any key to exit...");
+            Console.ReadKey();
+        }
     }
 }
