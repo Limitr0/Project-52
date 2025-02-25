@@ -1,8 +1,8 @@
-namespace Shared;
+namespace Shared.Models;
 
 public class Message
 {
-    public string Sender { get; set; }
-    public string Content { get; set; }
+    public string Sender { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
     public DateTime ReceivedTime { get; set; }
 }
