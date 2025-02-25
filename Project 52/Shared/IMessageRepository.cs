@@ -1,4 +1,5 @@
-namespace Shared;
+namespace DataAccess.Interfaces;
+using Shared.Models;
 using System.Collections.Generic;
 
 public interface IMessageRepository
