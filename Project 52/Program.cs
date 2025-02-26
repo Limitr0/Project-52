@@ -179,4 +179,3 @@ public class MessageServiceTests
         Assert.AreEqual("Alice", messages[0].Sender);
     }
 }
-
